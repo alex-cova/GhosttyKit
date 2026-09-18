@@ -193,18 +193,28 @@ ensure_gettext() {
 }
 
 clone_ghostty() {
+    local ref="$GHOSTTY_REF"
+
     if [[ -d "$SRC_DIR/.git" ]]; then
-        log "updating Ghostty in $SRC_DIR ($GHOSTTY_REF)"
-        git -C "$SRC_DIR" fetch --tags --depth 1 origin "$GHOSTTY_REF" || \
-            git -C "$SRC_DIR" fetch --depth 1 origin "$GHOSTTY_REF"
-        git -C "$SRC_DIR" checkout --detach FETCH_HEAD
+        log "updating Ghostty in $SRC_DIR ($ref)"
+        if git -C "$SRC_DIR" fetch --depth 1 origin "refs/tags/$ref:refs/tags/$ref" 2>/dev/null; then
+            git -C "$SRC_DIR" checkout --detach "refs/tags/$ref"
+        elif git -C "$SRC_DIR" fetch --depth 1 origin "$ref"; then
+            git -C "$SRC_DIR" checkout --detach FETCH_HEAD
+        else
+            die "could not fetch Ghostty ref $ref"
+        fi
     else
-        log "cloning Ghostty $GHOSTTY_REF"
+        log "cloning Ghostty $ref"
         mkdir -p "$(dirname "$SRC_DIR")"
-        git clone --depth 1 --branch "$GHOSTTY_REF" "$GHOSTTY_REPO" "$SRC_DIR" \
-            || git clone --depth 1 "$GHOSTTY_REPO" "$SRC_DIR"
-        if ! git -C "$SRC_DIR" checkout "$GHOSTTY_REF" 2>/dev/null; then
-            log "ref $GHOSTTY_REF not found locally; staying on default branch"
+        rm -rf "$SRC_DIR"
+        git clone "$GHOSTTY_REPO" "$SRC_DIR"
+        if git -C "$SRC_DIR" fetch --depth 1 origin "refs/tags/$ref:refs/tags/$ref" 2>/dev/null; then
+            git -C "$SRC_DIR" checkout --detach "refs/tags/$ref"
+        elif git -C "$SRC_DIR" fetch --depth 1 origin "$ref"; then
+            git -C "$SRC_DIR" checkout --detach FETCH_HEAD
+        else
+            die "could not fetch Ghostty ref $ref"
         fi
     fi
 }

@@ -13,13 +13,20 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 90
     env:
       GHOSTTY_REF: v1.3.0
       ZIG_VERSION: 0.15.2
+      # Ghostty v1.3.0 needs macOS 15+ SDK symbols (e.g. kCVPixelFormatType_30RGB_r210).
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          xcodebuild -version
+          xcrun --show-sdk-version
 
       - name: Cache Ghostty and Zig build trees
         uses: actions/cache@v4
@@ -27,10 +34,10 @@ jobs:
           path: |
             .build-ghostty
             Scripts/.zig-toolchain
-          key: ghosttykit-build-${{ runner.os }}-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
+          key: ghosttykit-build-v2-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
           restore-keys: |
-            ghosttykit-build-${{ runner.os }}-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-
-            ghosttykit-build-${{ runner.os }}-
+            ghosttykit-build-v2-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-
+            ghosttykit-build-v2-
 
       - name: Build GhosttyKit.xcframework
         run: |
