@@ -33,11 +33,12 @@ jobs:
         with:
           path: |
             .build-ghostty
+            .zig-global-cache
             Scripts/.zig-toolchain
-          key: ghosttykit-reusable-v2-${{ inputs.ghostty_ref }}-${{ inputs.zig_version }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
+          key: ghosttykit-reusable-v3-${{ inputs.ghostty_ref }}-${{ inputs.zig_version }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
           restore-keys: |
-            ghosttykit-reusable-v2-${{ inputs.ghostty_ref }}-${{ inputs.zig_version }}-
-            ghosttykit-reusable-v2-
+            ghosttykit-reusable-v3-${{ inputs.ghostty_ref }}-${{ inputs.zig_version }}-
+            ghosttykit-reusable-v3-
 
       - name: Build GhosttyKit.xcframework
         env:

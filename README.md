@@ -123,7 +123,7 @@ The Swift target should depend on `GhosttyKitXCFramework` and define `GHOSTTYKIT
 
 ## CI
 
-This repository builds and tests on `macos-15` with Xcode 16.4 via [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Ghostty v1.3.0 needs the macOS 15 SDK; older GitHub-hosted images (for example `macos-14` / Xcode 15.4) fail with missing CoreVideo symbols. Tagged releases can attach `GhosttyKit.xcframework.zip` through [`.github/workflows/release-xcframework.yml`](.github/workflows/release-xcframework.yml).
+This repository builds and tests on `macos-15` with Xcode 16.4 via [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Ghostty v1.3.0 needs the macOS 15 SDK; older GitHub-hosted images (for example `macos-14` / Xcode 15.4) fail with missing CoreVideo symbols. CI caches Ghostty's Zig package downloads under `.zig-global-cache` and retries fetches from `deps.files.ghostty.org` when the network is flaky. Tagged releases can attach `GhosttyKit.xcframework.zip` through [`.github/workflows/release-xcframework.yml`](.github/workflows/release-xcframework.yml).
 
 Consumer apps (for example [Umbra](https://github.com/alex-cova/Penumbra)) should resolve the package, build libghostty inside the SPM checkout, then compile:
 

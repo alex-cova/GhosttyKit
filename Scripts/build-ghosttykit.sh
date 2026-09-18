@@ -16,6 +16,9 @@ SRC_DIR="${GHOSTTY_SRC:-$root/.build-ghostty/ghostty}"
 VENDOR_DIR="$root/Vendor"
 KIT_DEST="$VENDOR_DIR/GhosttyKit.xcframework"
 ZIG_HOME="$root/Scripts/.zig-toolchain"
+ZIG_GLOBAL_CACHE_DIR="${ZIG_GLOBAL_CACHE_DIR:-$root/.zig-global-cache}"
+export ZIG_GLOBAL_CACHE_DIR
+mkdir -p "$ZIG_GLOBAL_CACHE_DIR"
 
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -219,19 +222,72 @@ clone_ghostty() {
     fi
 }
 
+zig_build_args=(
+    -Demit-xcframework=true
+    -Dxcframework-target=native
+    -Demit-macos-app=false
+    -Doptimize=ReleaseFast
+)
+
+run_with_retries() {
+    local label="$1"
+    shift
+    local attempt=1
+    local max_attempts="${ZIG_BUILD_RETRIES:-5}"
+    local delay="${ZIG_BUILD_RETRY_DELAY:-30}"
+
+    while (( attempt <= max_attempts )); do
+        if "$@"; then
+            return 0
+        fi
+
+        if (( attempt == max_attempts )); then
+            return 1
+        fi
+
+        log "${label} failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s"
+        sleep "$delay"
+        if (( delay < 120 )); then
+            delay=$((delay * 2))
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    return 1
+}
+
+prefetch_ghostty_deps() {
+    local zon="$SRC_DIR/build.zig.zon"
+    [[ -f "$zon" ]] || die "missing $zon"
+
+    local urls
+    urls="$(grep -o 'https://deps\.files\.ghostty\.org[^"]*' "$zon" | sort -u)"
+    [[ -n "$urls" ]] || return 0
+
+    log "prefetching Ghostty vendor archives into $ZIG_GLOBAL_CACHE_DIR"
+    while IFS= read -r url; do
+        [[ -n "$url" ]] || continue
+        run_with_retries "zig fetch $url" \
+            zig fetch --global-cache-dir "$ZIG_GLOBAL_CACHE_DIR" "$url" \
+            || die "could not prefetch $url"
+    done <<< "$urls"
+}
+
+zig_build() {
+    (
+        cd "$SRC_DIR"
+        zig build "${zig_build_args[@]}"
+    )
+}
+
 build_kit() {
     export PATH="$root/Scripts/shims:$PATH"
     chmod +x "$root/Scripts/shims/metallib"
 
+    prefetch_ghostty_deps
+
     log "building GhosttyKit (this takes several minutes)"
-    (
-        cd "$SRC_DIR"
-        zig build \
-            -Demit-xcframework=true \
-            -Dxcframework-target=native \
-            -Demit-macos-app=false \
-            -Doptimize=ReleaseFast
-    )
+    run_with_retries "zig build" zig_build || die "zig build failed"
 }
 
 install_kit() {

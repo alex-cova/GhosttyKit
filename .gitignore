@@ -12,5 +12,6 @@ Vendor/*.xcframework.zip
 # Local Ghostty / Zig build trees
 .build-ghostty/
 .zig-cache/
+.zig-global-cache/
 zig-out/
 Scripts/.zig-toolchain/

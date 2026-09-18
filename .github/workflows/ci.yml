@@ -33,11 +33,12 @@ jobs:
         with:
           path: |
             .build-ghostty
+            .zig-global-cache
             Scripts/.zig-toolchain
-          key: ghosttykit-build-v2-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
+          key: ghosttykit-build-v3-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
           restore-keys: |
-            ghosttykit-build-v2-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-
-            ghosttykit-build-v2-
+            ghosttykit-build-v3-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-
+            ghosttykit-build-v3-
 
       - name: Build GhosttyKit.xcframework
         run: |
