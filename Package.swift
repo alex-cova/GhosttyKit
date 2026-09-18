@@ -36,7 +36,7 @@ var packageTargets: [Target] = [
     .testTarget(
         name: "GhosttyKitTests",
         dependencies: ["GhosttyKit"],
-        swiftSettings: [.swiftLanguageMode(.v6)]
+        swiftSettings: ghosttyKitSettings
     ),
     .executableTarget(
         name: "GhosttyKitDemo",
