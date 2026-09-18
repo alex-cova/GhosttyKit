@@ -192,40 +192,42 @@ private func ghosttyAction(
 
 private func ghosttyCloseSurface(_ userdata: UnsafeMutableRawPointer?, _ processAlive: Bool) {
     guard let userdata else { return }
-    let view = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
-    view.session?.onClose?(processAlive)
-    view.session?.isProcessRunning = false
+    nonisolated(unsafe) let capturedUserdata = userdata
+    MainActor.assumeIsolated {
+        let view = Unmanaged<GhosttySurfaceView>.fromOpaque(capturedUserdata).takeUnretainedValue()
+        view.session?.onClose?(processAlive)
+        view.session?.isProcessRunning = false
+    }
 }
 
 private func ghosttyReadClipboard(
     _ userdata: UnsafeMutableRawPointer?,
     _ location: ghostty_clipboard_e,
-    _ state: UnsafeMutableRawPointer?,
-    _ mimes: UnsafePointer<UnsafePointer<CChar>?>?,
-    _ mimesLen: Int,
-    _ list: Bool
-) -> ghostty_clipboard_read_result_e {
-    guard let userdata else { return GHOSTTY_CLIPBOARD_READ_UNSUPPORTED }
-    let view = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
-    return view.completeClipboardRead(
-        location: location,
-        state: state,
-        mimes: mimes,
-        mimesLen: mimesLen,
-        list: list
-    )
+    _ state: UnsafeMutableRawPointer?
+) {
+    guard let userdata else { return }
+    nonisolated(unsafe) let capturedUserdata = userdata
+    nonisolated(unsafe) let capturedState = state
+    MainActor.assumeIsolated {
+        let view = Unmanaged<GhosttySurfaceView>.fromOpaque(capturedUserdata).takeUnretainedValue()
+        view.readClipboard(location: location, state: capturedState)
+    }
 }
 
 private func ghosttyConfirmReadClipboard(
     _ userdata: UnsafeMutableRawPointer?,
-    _ confirm: UnsafePointer<ghostty_clipboard_confirm_s>?,
+    _ string: UnsafePointer<CChar>?,
     _ state: UnsafeMutableRawPointer?,
     _ request: ghostty_clipboard_request_e
 ) {
-    _ = request
     guard let userdata else { return }
-    let view = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
-    view.denyClipboard(state: state)
+    nonisolated(unsafe) let capturedUserdata = userdata
+    nonisolated(unsafe) let capturedString = string
+    nonisolated(unsafe) let capturedState = state
+    MainActor.assumeIsolated {
+        let view = Unmanaged<GhosttySurfaceView>.fromOpaque(capturedUserdata).takeUnretainedValue()
+        view.confirmReadClipboard(string: capturedString, state: capturedState, request: request)
+    }
 }
 
 private func ghosttyWriteClipboard(
@@ -236,10 +238,15 @@ private func ghosttyWriteClipboard(
     _ confirm: Bool
 ) {
     guard let userdata else { return }
-    let view = Unmanaged<GhosttySurfaceView>.fromOpaque(userdata).takeUnretainedValue()
-    view.writeClipboard(location: location, content: content, len: len, confirm: confirm)
+    nonisolated(unsafe) let capturedUserdata = userdata
+    nonisolated(unsafe) let capturedContent = content
+    MainActor.assumeIsolated {
+        let view = Unmanaged<GhosttySurfaceView>.fromOpaque(capturedUserdata).takeUnretainedValue()
+        view.writeClipboard(location: location, content: capturedContent, len: len, confirm: confirm)
+    }
 }
 
+@MainActor
 enum GhosttyActionRouter {
     static func handle(target: ghostty_target_s, action: ghostty_action_s) -> Bool {
         let view: GhosttySurfaceView? = {

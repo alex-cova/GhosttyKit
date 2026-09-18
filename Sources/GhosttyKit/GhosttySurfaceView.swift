@@ -382,43 +382,37 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     #if GHOSTTYKIT_HAS_KIT
-    func completeClipboardRead(
-        location: ghostty_clipboard_e,
-        state: UnsafeMutableRawPointer?,
-        mimes: UnsafePointer<UnsafePointer<CChar>?>?,
-        mimesLen: Int,
-        list: Bool
-    ) -> ghostty_clipboard_read_result_e {
-        guard let surface else { return GHOSTTY_CLIPBOARD_READ_UNSUPPORTED }
+    func readClipboard(location: ghostty_clipboard_e, state: UnsafeMutableRawPointer?) {
+        guard let surface else { return }
         let pasteboard: NSPasteboard = location == GHOSTTY_CLIPBOARD_SELECTION
             ? NSPasteboard(name: .find)
             : .general
-
-        var contents: [ClipboardPayload] = []
-        if let mimes {
-            for index in 0..<mimesLen {
-                guard let pointer = mimes[index] else { continue }
-                let mime = String(cString: pointer)
-                if mime == "text/plain", let string = pasteboard.string(forType: .string),
-                   let data = string.data(using: .utf8) {
-                    contents.append(ClipboardPayload(mime: mime, data: data))
-                }
-            }
-        }
-        if contents.isEmpty, let string = pasteboard.string(forType: .string),
-           let data = string.data(using: .utf8) {
-            contents.append(ClipboardPayload(mime: "text/plain", data: data))
-        }
-        if contents.isEmpty && !list {
-            return GHOSTTY_CLIPBOARD_READ_UNAVAILABLE
-        }
-        completeClipboard(surface: surface, contents: contents, state: state)
-        return GHOSTTY_CLIPBOARD_READ_STARTED
+        let string = pasteboard.string(forType: .string) ?? ""
+        completeClipboardRequest(surface: surface, data: string, state: state)
     }
 
-    func denyClipboard(state: UnsafeMutableRawPointer?) {
+    func confirmReadClipboard(
+        string: UnsafePointer<CChar>?,
+        state: UnsafeMutableRawPointer?,
+        request: ghostty_clipboard_request_e
+    ) {
         guard let surface else { return }
-        ghostty_surface_deny_clipboard_request(surface, state)
+        _ = request
+
+        guard let string else {
+            completeClipboardRequest(surface: surface, data: "", state: state, confirmed: false)
+            return
+        }
+
+        let value = String(cString: string)
+        let allowed = configuration.allowsUnconfirmedClipboardWrites
+            || session?.onConfirmClipboardWrite?(value) == true
+        guard allowed else {
+            completeClipboardRequest(surface: surface, data: "", state: state, confirmed: false)
+            return
+        }
+
+        completeClipboardRequest(surface: surface, data: value, state: state, confirmed: true)
     }
 
     func writeClipboard(
@@ -432,17 +426,15 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
             ? NSPasteboard(name: .find)
             : .general
 
-        var texts: [String] = []
+        var textPlain: String?
         for index in 0..<len {
             let item = content[index]
-            guard let mimePtr = item.mime, String(cString: mimePtr) == "text/plain" else { continue }
-            if item.len > 0, let data = item.data {
-                if let string = String(bytes: UnsafeBufferPointer(start: data, count: item.len).map { UInt8(bitPattern: $0) }, encoding: .utf8) {
-                    texts.append(string)
-                }
-            }
+            guard let mimePtr = item.mime, let dataPtr = item.data else { continue }
+            guard String(cString: mimePtr) == "text/plain" else { continue }
+            textPlain = String(cString: dataPtr)
+            break
         }
-        guard let string = texts.first else { return }
+        guard let string = textPlain else { return }
 
         if confirm {
             let allowed = configuration.allowsUnconfirmedClipboardWrites
@@ -454,59 +446,18 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
         pasteboard.setString(string, forType: .string)
     }
 
-    private func completeClipboard(
+    private func completeClipboardRequest(
         surface: ghostty_surface_t,
-        contents: [ClipboardPayload],
-        state: UnsafeMutableRawPointer?
+        data: String,
+        state: UnsafeMutableRawPointer?,
+        confirmed: Bool = false
     ) {
-        var cStrings: [UnsafeMutablePointer<CChar>] = []
-        var cDatas: [UnsafeMutableRawPointer] = []
-        defer {
-            cStrings.forEach { free($0) }
-            cDatas.forEach { $0.deallocate() }
-        }
-
-        var cContents: [ghostty_clipboard_content_s] = []
-        for entry in contents {
-            guard let mime = strdup(entry.mime) else { continue }
-            cStrings.append(mime)
-            let buf = UnsafeMutableRawPointer.allocate(byteCount: max(entry.data.count, 1), alignment: 1)
-            cDatas.append(buf)
-            entry.data.withUnsafeBytes { src in
-                if let base = src.baseAddress {
-                    buf.copyMemory(from: base, byteCount: src.count)
-                }
-            }
-            cContents.append(
-                ghostty_clipboard_content_s(
-                    mime: mime,
-                    data: buf.assumingMemoryBound(to: CChar.self),
-                    len: entry.data.count
-                )
-            )
-        }
-
-        cContents.withUnsafeBufferPointer { buffer in
-            var complete = ghostty_clipboard_complete_s(
-                contents: buffer.baseAddress,
-                contents_len: buffer.count,
-                available: nil,
-                available_len: 0,
-                confirmed: false,
-                remember: false
-            )
-            ghostty_surface_complete_clipboard_request(surface, &complete, state)
+        data.withCString { ptr in
+            ghostty_surface_complete_clipboard_request(surface, ptr, state, confirmed)
         }
     }
     #endif
 }
-
-#if GHOSTTYKIT_HAS_KIT
-private struct ClipboardPayload {
-    var mime: String
-    var data: Data
-}
-#endif
 
 extension GhosttySurfaceView: @preconcurrency NSTextInputClient, NSUserInterfaceValidations {
     func hasMarkedText() -> Bool {
