@@ -3,9 +3,10 @@
 import Foundation
 import PackageDescription
 
+let kitRelativePath = "Vendor/GhosttyKit.xcframework"
 let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
-let kitPath = "\(packageDirectory)/Vendor/GhosttyKit.xcframework"
-let hasGhosttyKit = FileManager.default.fileExists(atPath: kitPath)
+let kitAbsolutePath = "\(packageDirectory)/\(kitRelativePath)"
+let hasGhosttyKit = FileManager.default.fileExists(atPath: kitAbsolutePath)
 
 let ghosttyKitSettings: [SwiftSetting] = hasGhosttyKit
     ? [.swiftLanguageMode(.v6), .define("GHOSTTYKIT_HAS_KIT")]
@@ -32,7 +33,7 @@ var packageTargets: [Target] = [
 
 if hasGhosttyKit {
     packageTargets.insert(
-        .binaryTarget(name: "GhosttyKitXCFramework", path: kitPath),
+        .binaryTarget(name: "GhosttyKitXCFramework", path: kitRelativePath),
         at: 0
     )
 }
