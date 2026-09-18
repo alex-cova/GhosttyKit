@@ -12,11 +12,26 @@ let ghosttyKitSettings: [SwiftSetting] = hasGhosttyKit
     ? [.swiftLanguageMode(.v6), .define("GHOSTTYKIT_HAS_KIT")]
     : [.swiftLanguageMode(.v6)]
 
+// libghostty-fat.a is static; SwiftPM must link its Apple/C++ dependencies too.
+let ghosttyKitLinkerSettings: [LinkerSetting] = hasGhosttyKit
+    ? [
+        .linkedLibrary("c++"),
+        .linkedFramework("Carbon"),
+        .linkedFramework("CoreFoundation"),
+        .linkedFramework("CoreGraphics"),
+        .linkedFramework("CoreText"),
+        .linkedFramework("CoreVideo"),
+        .linkedFramework("IOSurface"),
+        .linkedFramework("QuartzCore"),
+    ]
+    : []
+
 var packageTargets: [Target] = [
     .target(
         name: "GhosttyKit",
         dependencies: hasGhosttyKit ? ["GhosttyKitXCFramework"] : [],
-        swiftSettings: ghosttyKitSettings
+        swiftSettings: ghosttyKitSettings,
+        linkerSettings: ghosttyKitLinkerSettings
     ),
     .testTarget(
         name: "GhosttyKitTests",
