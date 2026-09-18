@@ -1,0 +1,65 @@
+name: Release XCFramework
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      GHOSTTY_REF: v1.3.0
+      ZIG_VERSION: 0.15.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Ghostty and Zig build trees
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build-ghostty
+            Scripts/.zig-toolchain
+          key: ghosttykit-release-${{ runner.os }}-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
+          restore-keys: |
+            ghosttykit-release-${{ runner.os }}-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-
+            ghosttykit-release-${{ runner.os }}-
+
+      - name: Build GhosttyKit.xcframework
+        run: |
+          chmod +x Scripts/build-ghosttykit.sh Scripts/shims/metallib
+          ./Scripts/build-ghosttykit.sh
+
+      - name: Compute SwiftPM checksum
+        id: checksum
+        run: |
+          checksum="$(swift package compute-checksum Vendor/GhosttyKit.xcframework.zip)"
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+          {
+            echo "## GhosttyKit.xcframework"
+            echo
+            echo "- Zip: \`Vendor/GhosttyKit.xcframework.zip\`"
+            echo "- Checksum: \`$checksum\`"
+            echo "- Ghostty revision: \`$(cat Vendor/GHOSTTY_REVISION)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Vendor/GhosttyKit.xcframework.zip
+
+      - name: Upload build artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GhosttyKit.xcframework
+          path: |
+            Vendor/GhosttyKit.xcframework.zip
+            Vendor/GHOSTTY_REVISION
+            Vendor/ghostty.h
+          if-no-files-found: error

@@ -1,0 +1,52 @@
+name: Build GhosttyKit XCFramework
+
+on:
+  workflow_call:
+    inputs:
+      ghostty_ref:
+        description: Ghostty git ref to build
+        required: false
+        type: string
+        default: v1.3.0
+      zig_version:
+        description: Zig toolchain version
+        required: false
+        type: string
+        default: 0.15.2
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Ghostty and Zig build trees
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build-ghostty
+            Scripts/.zig-toolchain
+          key: ghosttykit-reusable-${{ runner.os }}-${{ inputs.ghostty_ref }}-${{ inputs.zig_version }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
+          restore-keys: |
+            ghosttykit-reusable-${{ runner.os }}-${{ inputs.ghostty_ref }}-${{ inputs.zig_version }}-
+            ghosttykit-reusable-${{ runner.os }}-
+
+      - name: Build GhosttyKit.xcframework
+        env:
+          GHOSTTY_REF: ${{ inputs.ghostty_ref }}
+          ZIG_VERSION: ${{ inputs.zig_version }}
+        run: |
+          chmod +x Scripts/build-ghosttykit.sh Scripts/shims/metallib
+          ./Scripts/build-ghosttykit.sh
+
+      - name: Upload XCFramework artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghosttykit-xcframework
+          path: |
+            Vendor/GhosttyKit.xcframework
+            Vendor/GhosttyKit.xcframework.zip
+            Vendor/GHOSTTY_REVISION
+          retention-days: 7
+          if-no-files-found: error

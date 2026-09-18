@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      GHOSTTY_REF: v1.3.0
+      ZIG_VERSION: 0.15.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Ghostty and Zig build trees
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build-ghostty
+            Scripts/.zig-toolchain
+          key: ghosttykit-build-${{ runner.os }}-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-${{ hashFiles('Scripts/build-ghosttykit.sh', 'Scripts/patches/**') }}
+          restore-keys: |
+            ghosttykit-build-${{ runner.os }}-${{ env.GHOSTTY_REF }}-${{ env.ZIG_VERSION }}-
+            ghosttykit-build-${{ runner.os }}-
+
+      - name: Build GhosttyKit.xcframework
+        run: |
+          chmod +x Scripts/build-ghosttykit.sh Scripts/shims/metallib Scripts/ci-prepare-swiftpm-checkout.sh
+          ./Scripts/build-ghosttykit.sh
+
+      - name: Build package
+        run: swift build -c release
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build demo
+        run: swift build -c release --product GhosttyKitDemo

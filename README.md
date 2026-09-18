@@ -121,6 +121,20 @@ Do not commit the XCFramework to git. Attach `Vendor/GhosttyKit.xcframework.zip`
 
 The Swift target should depend on `GhosttyKitXCFramework` and define `GHOSTTYKIT_HAS_KIT` when the binary is linked. This repository's `Package.swift` already does that for a local `Vendor/GhosttyKit.xcframework`.
 
+## CI
+
+This repository builds and tests on `macos-14` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Tagged releases can attach `GhosttyKit.xcframework.zip` through [`.github/workflows/release-xcframework.yml`](.github/workflows/release-xcframework.yml).
+
+Consumer apps (for example [Umbra](https://github.com/alex-cova/Penumbra)) should resolve the package, build libghostty inside the SPM checkout, then compile:
+
+```sh
+swift package resolve
+./Scripts/ci-prepare-swiftpm-checkout.sh   # from GhosttyKit, or the consumer wrapper
+swift build
+```
+
+Penumbra wraps that in `Scripts/prepare-ghosttykit.sh` and runs it from Umbra CI before `swift build --product Umbra`.
+
 ## API
 
 **`GhosttyView`**
