@@ -1,4 +1,4 @@
-import GhosttyUI
+import GhosttyKit
 import SwiftUI
 
 struct GhosttyDemoRoot: View {

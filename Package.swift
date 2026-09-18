@@ -3,47 +3,48 @@
 import Foundation
 import PackageDescription
 
-let kitPath = "Vendor/GhosttyKit.xcframework"
+let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
+let kitPath = "\(packageDirectory)/Vendor/GhosttyKit.xcframework"
 let hasGhosttyKit = FileManager.default.fileExists(atPath: kitPath)
 
-let ghosttyUISettings: [SwiftSetting] = hasGhosttyKit
-    ? [.swiftLanguageMode(.v6), .define("GHOSTTYUI_HAS_KIT")]
+let ghosttyKitSettings: [SwiftSetting] = hasGhosttyKit
+    ? [.swiftLanguageMode(.v6), .define("GHOSTTYKIT_HAS_KIT")]
     : [.swiftLanguageMode(.v6)]
 
 var packageTargets: [Target] = [
     .target(
-        name: "GhosttyUI",
-        dependencies: hasGhosttyKit ? ["GhosttyKit"] : [],
-        swiftSettings: ghosttyUISettings
+        name: "GhosttyKit",
+        dependencies: hasGhosttyKit ? ["GhosttyKitXCFramework"] : [],
+        swiftSettings: ghosttyKitSettings
     ),
     .testTarget(
-        name: "GhosttyUITests",
-        dependencies: ["GhosttyUI"],
+        name: "GhosttyKitTests",
+        dependencies: ["GhosttyKit"],
         swiftSettings: [.swiftLanguageMode(.v6)]
     ),
     .executableTarget(
-        name: "GhosttyUIDemo",
-        dependencies: ["GhosttyUI"],
-        path: "Examples/GhosttyUIDemo",
-        swiftSettings: ghosttyUISettings
+        name: "GhosttyKitDemo",
+        dependencies: ["GhosttyKit"],
+        path: "Examples/GhosttyKitDemo",
+        swiftSettings: ghosttyKitSettings
     )
 ]
 
 if hasGhosttyKit {
     packageTargets.insert(
-        .binaryTarget(name: "GhosttyKit", path: kitPath),
+        .binaryTarget(name: "GhosttyKitXCFramework", path: kitPath),
         at: 0
     )
 }
 
 let package = Package(
-    name: "GhosttyUI",
+    name: "GhosttyKit",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .library(name: "GhosttyUI", targets: ["GhosttyUI"]),
-        .executable(name: "GhosttyUIDemo", targets: ["GhosttyUIDemo"])
+        .library(name: "GhosttyKit", targets: ["GhosttyKit"]),
+        .executable(name: "GhosttyKitDemo", targets: ["GhosttyKitDemo"])
     ],
     targets: packageTargets
 )

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct GhosttyUIDemoApp: App {
+struct GhosttyKitDemoApp: App {
     var body: some Scene {
         WindowGroup {
             GhosttyDemoRoot()

@@ -1,8 +1,8 @@
 @preconcurrency import AppKit
 import Foundation
 
-#if GHOSTTYUI_HAS_KIT
-import GhosttyKit
+#if GHOSTTYKIT_HAS_KIT
+import GhosttyKitC
 #endif
 
 /// AppKit surface that hosts libghostty's Metal renderer.
@@ -11,7 +11,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     weak var session: GhosttySession?
     let configuration: GhosttySurfaceConfiguration
 
-    #if GHOSTTYUI_HAS_KIT
+    #if GHOSTTYKIT_HAS_KIT
     nonisolated(unsafe) private var surface: ghostty_surface_t?
     #endif
 
@@ -44,7 +44,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
         if let eventMonitor {
             NSEvent.removeMonitor(eventMonitor)
         }
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         if let surface {
             let handle = surface
             Task { @MainActor in
@@ -60,7 +60,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
             NSEvent.removeMonitor(eventMonitor)
             self.eventMonitor = nil
         }
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         GhosttyRuntime.shared.forgetSurface(self)
         if let surface {
             ghostty_surface_free(surface)
@@ -70,7 +70,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     private func setup() {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         do {
             let created = try GhosttyRuntime.shared.makeSurface(view: self, configuration: configuration)
             surface = created
@@ -92,7 +92,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     func sendText(_ text: String) {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface, !text.isEmpty else { return }
         text.withCString { ptr in
             ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
@@ -101,7 +101,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     func requestClose() {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface else { return }
         ghostty_surface_request_close(surface)
         #endif
@@ -139,7 +139,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         syncSurfaceMetrics()
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         GhosttyRuntime.shared.applyColorScheme()
         if let surface {
             ghostty_surface_set_focus(surface, window?.firstResponder === self)
@@ -158,7 +158,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     private func syncSurfaceMetrics() {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface, bounds.width > 0, bounds.height > 0 else { return }
         if let window {
             CATransaction.begin()
@@ -176,7 +176,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
 
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         if let surface { ghostty_surface_set_focus(surface, true) }
         #endif
         return ok
@@ -184,7 +184,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
 
     override func resignFirstResponder() -> Bool {
         let ok = super.resignFirstResponder()
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         if let surface { ghostty_surface_set_focus(surface, false) }
         #endif
         return ok
@@ -208,7 +208,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     override func mouseExited(with event: NSEvent) {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface else { return }
         let mods = GhosttyInput.mods(from: event.modifierFlags)
         ghostty_surface_mouse_pos(surface, -1, -1, ghostty_input_mods_e(mods.rawValue))
@@ -216,7 +216,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface else { return }
         var x = event.scrollingDeltaX
         var y = event.scrollingDeltaY
@@ -235,7 +235,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
 
     private func sendMouseButton(_ event: NSEvent, pressed: Bool) {
         window?.makeFirstResponder(self)
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface else { return }
         sendMouseMoved(event)
         let mods = GhosttyInput.mods(from: event.modifierFlags)
@@ -249,7 +249,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     private func sendMouseMoved(_ event: NSEvent) {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface else { return }
         let pos = convert(event.locationInWindow, from: nil)
         let mods = GhosttyInput.mods(from: event.modifierFlags)
@@ -291,7 +291,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
 
     @discardableResult
     private func sendKey(_ event: NSEvent, isRelease: Bool = false, actionRepeat: Bool = false) -> Bool {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface else { return false }
         let action: ghostty_input_action_e = if isRelease {
             GHOSTTY_ACTION_RELEASE
@@ -348,7 +348,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     @objc func copy(_ sender: Any?) {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface, ghostty_surface_has_selection(surface) else { return }
         var text = ghostty_text_s()
         guard ghostty_surface_read_selection(surface, &text) else { return }
@@ -370,7 +370,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     }
 
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         if item.action == #selector(copy(_:)) {
             return surface.map { ghostty_surface_has_selection($0) } ?? false
         }
@@ -381,7 +381,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
         return true
     }
 
-    #if GHOSTTYUI_HAS_KIT
+    #if GHOSTTYKIT_HAS_KIT
     func completeClipboardRead(
         location: ghostty_clipboard_e,
         state: UnsafeMutableRawPointer?,
@@ -501,7 +501,7 @@ final class GhosttySurfaceView: NSView, GhosttySurfaceAttaching {
     #endif
 }
 
-#if GHOSTTYUI_HAS_KIT
+#if GHOSTTYKIT_HAS_KIT
 private struct ClipboardPayload {
     var mime: String
     var data: Data
@@ -530,7 +530,7 @@ extension GhosttySurfaceView: @preconcurrency NSTextInputClient, NSUserInterface
             NSAttributedString()
         }
         markedText = NSMutableAttributedString(attributedString: attributed)
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         if let surface {
             let value = markedText.string
             value.withCString { ptr in
@@ -542,7 +542,7 @@ extension GhosttySurfaceView: @preconcurrency NSTextInputClient, NSUserInterface
 
     func unmarkText() {
         markedText = NSMutableAttributedString()
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         if let surface {
             ghostty_surface_preedit(surface, "", 0)
         }
@@ -558,7 +558,7 @@ extension GhosttySurfaceView: @preconcurrency NSTextInputClient, NSUserInterface
     func characterIndex(for point: NSPoint) -> Int { NSNotFound }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let surface, let window else { return .zero }
         var x: Double = 0
         var y: Double = 0

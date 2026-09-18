@@ -1,8 +1,8 @@
 import AppKit
 import Foundation
 
-#if GHOSTTYUI_HAS_KIT
-import GhosttyKit
+#if GHOSTTYKIT_HAS_KIT
+import GhosttyKitC
 #endif
 
 /// Process-wide libghostty runtime. One `ghostty_app_t` is shared by every
@@ -11,9 +11,9 @@ import GhosttyKit
 public final class GhosttyRuntime {
     public static let shared = GhosttyRuntime()
 
-    /// True when this build of GhosttyUI was linked against GhosttyKit.
+    /// True when this build of GhosttyKit was linked against libghostty.
     public nonisolated static var isAvailable: Bool {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         true
         #else
         false
@@ -22,7 +22,7 @@ public final class GhosttyRuntime {
 
     public private(set) var isRunning = false
 
-    #if GHOSTTYUI_HAS_KIT
+    #if GHOSTTYKIT_HAS_KIT
     private var app: ghostty_app_t?
     private var config: ghostty_config_t?
     #endif
@@ -32,7 +32,7 @@ public final class GhosttyRuntime {
     private init() {}
 
     public func start() throws {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         if isRunning { return }
 
         let initStatus = ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv)
@@ -73,13 +73,13 @@ public final class GhosttyRuntime {
     }
 
     func tick() {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         guard let app else { return }
         ghostty_app_tick(app)
         #endif
     }
 
-    #if GHOSTTYUI_HAS_KIT
+    #if GHOSTTYKIT_HAS_KIT
     func makeSurface(
         view: GhosttySurfaceView,
         configuration: GhosttySurfaceConfiguration
@@ -113,7 +113,7 @@ public final class GhosttyRuntime {
     #endif
 }
 
-#if GHOSTTYUI_HAS_KIT
+#if GHOSTTYKIT_HAS_KIT
 
 extension GhosttySurfaceConfiguration {
     func withCValue<T>(view: NSView, scale: Double, _ body: (inout ghostty_surface_config_s) -> T) -> T {

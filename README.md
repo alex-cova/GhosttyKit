@@ -1,9 +1,11 @@
-# GhosttyUI
+# GhosttyKit
 
-SwiftUI bindings for [Ghostty](https://github.com/ghostty-org/ghostty). Drop a real libghostty terminal into a macOS app:
+SwiftUI bindings for [Ghostty](https://github.com/ghostty-org/ghostty). Drop a real libghostty terminal into a macOS app.
+
+Repository: [github.com/alex-cova/GhosttyKit](https://github.com/alex-cova/GhosttyKit)
 
 ```swift
-import GhosttyUI
+import GhosttyKit
 
 struct EditorTerminal: View {
     @State private var session = GhosttySession(
@@ -36,10 +38,10 @@ Apple Silicon is the default XCFramework target (`-Dxcframework-target=native`).
 ## Package layout
 
 ```
-Sources/GhosttyUI/     SwiftUI view, session, AppKit surface, FFI
-Examples/GhosttyUIDemo Sample window
-Scripts/               Build GhosttyKit.xcframework
-Vendor/                Installed XCFramework (gitignored, ~140MB)
+Sources/GhosttyKit/      SwiftUI view, session, AppKit surface, FFI
+Examples/GhosttyKitDemo/ Sample window
+Scripts/                 Build GhosttyKit.xcframework
+Vendor/                  Installed XCFramework (gitignored, ~140MB)
 ```
 
 ## First-time setup
@@ -47,9 +49,11 @@ Vendor/                Installed XCFramework (gitignored, ~140MB)
 The Swift package compiles without libghostty. Until the XCFramework is present, `GhosttyView` shows a placeholder and `GhosttyRuntime.isAvailable` is `false`.
 
 ```sh
+git clone git@github.com:alex-cova/GhosttyKit.git
+cd GhosttyKit
 chmod +x Scripts/build-ghosttykit.sh Scripts/shims/metallib
 ./Scripts/build-ghosttykit.sh
-swift run GhosttyUIDemo
+swift run GhosttyKitDemo
 ```
 
 The script:
@@ -66,40 +70,56 @@ Override pins as needed:
 GHOSTTY_REF=v1.3.0 ZIG_VERSION=0.15.2 ./Scripts/build-ghosttykit.sh
 ```
 
-You need Xcode (not only Command Line Tools), and Homebrew `gettext` is installed if missing. Xcode 26 no longer ships `metallib`; `Scripts/shims/metallib` stands in for it.
+You need Xcode (not only Command Line Tools). Homebrew `gettext` is installed automatically if missing. Xcode 26 no longer ships `metallib`; `Scripts/shims/metallib` stands in for it.
+
+On Xcode SDK 26.4 or newer (including Xcode 27 beta), the script installs Homebrew `zig@0.15` automatically. The official Zig 0.15.2 download cannot link against Apple's newer `libSystem` stubs on those SDKs. SDK 27 also applies a small Ghostty `math.h` overlay so Zig's bundled libc++ can compile.
 
 ## SwiftPM
 
-Until you publish a release, depend on a local clone:
+`Package.swift` checks for `Vendor/GhosttyKit.xcframework` at resolve time. If it is present, the package links libghostty and defines `GHOSTTYKIT_HAS_KIT`. If not, the Swift sources still compile and the placeholder view is used.
+
+Add the dependency:
 
 ```swift
 dependencies: [
-    .package(path: "../GhosttyUI")
+    .package(url: "https://github.com/alex-cova/GhosttyKit.git", branch: "main")
 ]
 ```
 
+For local development:
+
 ```swift
-.executableTarget(
-    name: "Umbra",
+dependencies: [
+    .package(path: "../GhosttyKit")
+]
+```
+
+Use the library product in your target:
+
+```swift
+.target(
+    name: "YourApp",
     dependencies: [
-        .product(name: "GhosttyUI", package: "GhosttyUI")
+        .product(name: "GhosttyKit", package: "GhosttyKit")
     ]
 )
 ```
 
+After adding the package, run `./Scripts/build-ghosttykit.sh` inside the GhosttyKit checkout (or place a prebuilt `Vendor/GhosttyKit.xcframework` there) before expecting a live terminal.
+
 ### Publishing
 
-Do not commit the XCFramework to git. Attach `Vendor/GhosttyKit.xcframework.zip` to a GitHub Release, then switch `Package.swift` to:
+Do not commit the XCFramework to git. Attach `Vendor/GhosttyKit.xcframework.zip` to a GitHub Release, then point consumers at that artifact with a remote `binaryTarget` named `GhosttyKitXCFramework`:
 
 ```swift
 .binaryTarget(
-    name: "GhosttyKit",
-    url: "https://github.com/<you>/GhosttyUI/releases/download/0.1.0/GhosttyKit.xcframework.zip",
+    name: "GhosttyKitXCFramework",
+    url: "https://github.com/alex-cova/GhosttyKit/releases/download/0.1.0/GhosttyKit.xcframework.zip",
     checksum: "<checksum from the build script>"
 )
 ```
 
-Keep `GHOSTTYUI_HAS_KIT` defined on the `GhosttyUI` target whenever `GhosttyKit` is linked.
+The Swift target should depend on `GhosttyKitXCFramework` and define `GHOSTTYKIT_HAS_KIT` when the binary is linked. This repository's `Package.swift` already does that for a local `Vendor/GhosttyKit.xcframework`.
 
 ## API
 
@@ -123,7 +143,7 @@ Keep `GHOSTTYUI_HAS_KIT` defined on the `GhosttyUI` target whenever `GhosttyKit`
 **`GhosttyRuntime`**
 
 - Shared `ghostty_app_t` for the process
-- `isAvailable` is compile-time (`GHOSTTYUI_HAS_KIT`)
+- `isAvailable` is compile-time (`GHOSTTYKIT_HAS_KIT`)
 
 The PTY is created when the view appears and destroyed when SwiftUI dismantles it. Hold the `GhosttySession` in `@State` so layout changes do not spawn a new shell.
 
@@ -137,7 +157,15 @@ Normal paste reads `NSPasteboard`. OSC 52 writes that require confirmation are d
 
 ## What this package does not do
 
-Ghostty's GUI owns tabs, splits, menus, config windows, and the inspector. Those stay in the host (Umbra, your app). `GHOSTTY_ACTION_NEW_TAB` / `NEW_WINDOW` become session callbacks so you can implement them.
+Ghostty's GUI owns tabs, splits, menus, config windows, and the inspector. Those stay in the host app. `GHOSTTY_ACTION_NEW_TAB` / `NEW_WINDOW` become session callbacks so you can implement them.
+
+## Migrating from GhosttyUI
+
+This project was renamed from GhosttyUI. Update your dependency URL or path, then replace:
+
+- `import GhosttyUI` → `import GhosttyKit`
+- `.product(name: "GhosttyUI", package: "GhosttyUI")` → `.product(name: "GhosttyKit", package: "GhosttyKit")`
+- `GHOSTTYUI_HAS_KIT` → `GHOSTTYKIT_HAS_KIT` (if you mirror compile flags in your own build)
 
 ## License
 

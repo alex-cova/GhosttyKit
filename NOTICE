@@ -1,4 +1,4 @@
-GhosttyUI includes, when you build Vendor/GhosttyKit.xcframework, code from Ghostty:
+GhosttyKit includes, when you build Vendor/GhosttyKit.xcframework, code from Ghostty:
 
   https://github.com/ghostty-org/ghostty
 

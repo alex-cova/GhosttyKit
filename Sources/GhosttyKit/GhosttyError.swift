@@ -2,7 +2,7 @@ import Foundation
 
 /// Errors raised while starting or driving libghostty.
 public enum GhosttyError: Error, Equatable, Sendable {
-    /// `Vendor/GhosttyKit.xcframework` is not present, so this build of GhosttyUI
+    /// `Vendor/GhosttyKit.xcframework` is not present, so this build of GhosttyKit
     /// was compiled without libghostty.
     case kitMissing
 
@@ -17,7 +17,7 @@ extension GhosttyError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .kitMissing:
-            return "libghostty is not linked. Run Scripts/build-ghosttykit.sh in the GhosttyUI package."
+            return "libghostty is not linked. Run Scripts/build-ghosttykit.sh in the GhosttyKit package."
         case .runtimeFailed(let message):
             return message
         case .surfaceFailed:

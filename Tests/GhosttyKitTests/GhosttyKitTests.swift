@@ -1,6 +1,6 @@
 import AppKit
 import Testing
-@testable import GhosttyUI
+@testable import GhosttyKit
 
 struct GhosttyURLPolicyTests {
     @Test func allowsHTTPS() {
@@ -67,7 +67,7 @@ struct GhosttySurfaceConfigurationTests {
 
 struct GhosttyRuntimeAvailabilityTests {
     @Test func availabilityMatchesCompileFlag() {
-        #if GHOSTTYUI_HAS_KIT
+        #if GHOSTTYKIT_HAS_KIT
         #expect(GhosttyRuntime.isAvailable)
         #else
         #expect(!GhosttyRuntime.isAvailable)

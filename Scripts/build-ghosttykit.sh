@@ -38,7 +38,63 @@ case "$arch" in
     *) die "unsupported architecture: $arch" ;;
 esac
 
+# Apple SDK >= 26.4 only publishes arm64e libSystem stubs. Stock Zig 0.15.2
+# cannot link against them, so `zig build` fails before Ghostty's build.zig runs.
+# Homebrew's zig@0.15 backports the upstream Mach-O linker fix.
+needs_patched_zig() {
+    local sdk
+    sdk="$(xcrun --show-sdk-version 2>/dev/null || true)"
+    [[ -n "$sdk" ]] || return 1
+
+    local major="${sdk%%.*}"
+    local minor="${sdk#*.}"
+    minor="${minor%%.*}"
+
+    if (( major > 26 )); then
+        return 0
+    fi
+    if (( major == 26 && minor >= 4 )); then
+        return 0
+    fi
+    return 1
+}
+
+brew_zig_bin() {
+    command -v brew >/dev/null 2>&1 || return 1
+    local prefix
+    prefix="$(brew --prefix "zig@${ZIG_VERSION%.*}" 2>/dev/null)" || return 1
+    local bin="$prefix/bin/zig"
+    [[ -x "$bin" ]] || return 1
+    printf '%s\n' "$bin"
+}
+
+ensure_patched_zig() {
+    local bin
+    bin="$(brew_zig_bin || true)"
+    if [[ -z "$bin" ]]; then
+        if command -v brew >/dev/null 2>&1; then
+            log "installing Homebrew zig@${ZIG_VERSION%.*} (required for Xcode SDK >= 26.4)"
+            brew install "zig@${ZIG_VERSION%.*}"
+            bin="$(brew_zig_bin)" || die "Homebrew zig@${ZIG_VERSION%.*} install failed"
+        else
+            die "Xcode SDK >= 26.4 requires Homebrew zig@${ZIG_VERSION%.*} (brew install zig@${ZIG_VERSION%.*}). Official Zig ${ZIG_VERSION} cannot link libSystem on this SDK."
+        fi
+    fi
+
+    local found
+    found="$("$bin" version)"
+    [[ "$found" == "$ZIG_VERSION" ]] || die "Homebrew zig@${ZIG_VERSION%.*} is $found, need $ZIG_VERSION"
+
+    export PATH="$(dirname "$bin"):$PATH"
+    log "using Homebrew zig $(zig version) (patched for SDK >= 26.4)"
+}
+
 ensure_zig() {
+    if needs_patched_zig; then
+        ensure_patched_zig
+        return
+    fi
+
     if command -v zig >/dev/null 2>&1; then
         local found
         found="$(zig version)"
@@ -72,6 +128,59 @@ ensure_zig() {
     fi
     export PATH="$ZIG_HOME/zig-${ZIG_VERSION}:$PATH"
     log "using zig $(zig version)"
+}
+
+needs_xcode27_math_overlay() {
+    local sdk
+    sdk="$(xcrun --show-sdk-version 2>/dev/null || true)"
+    [[ -n "$sdk" ]] || return 1
+    local major="${sdk%%.*}"
+    (( major >= 27 ))
+}
+
+patch_ghostty_for_xcode27() {
+    needs_xcode27_math_overlay || return 0
+
+    local apple_sdk="$SRC_DIR/pkg/apple-sdk"
+    local patch_root="$root/Scripts/patches/xcode27-apple-sdk"
+    local build_zig="$apple_sdk/build.zig"
+
+    [[ -f "$build_zig" ]] || die "missing $build_zig"
+
+    log "patching Ghostty apple-sdk for Xcode SDK >= 27"
+    mkdir -p "$apple_sdk/include"
+    cp "$patch_root/include/math.h" "$apple_sdk/include/math.h"
+    git -C "$SRC_DIR" checkout -- pkg/apple-sdk/build.zig
+
+    python3 - "$build_zig" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+text = text.replace(
+    "        const libc = try std.zig.LibCInstallation.findNative(.{",
+    "        var libc = try std.zig.LibCInstallation.findNative(.{",
+    1,
+)
+needle = """        });
+
+        // Render the file compatible with the `--libc` Zig flag."""
+insert = """        });
+
+        // GHOSTTYKIT_XCODE27_MATH_OVERLAY: Xcode 27 SDK needs INFINITY/NAN for Zig libc++.
+        libc.include_dir = try std.fs.path.join(b.allocator, &.{
+            try std.process.getCwdAlloc(b.allocator),
+            "pkg", "apple-sdk", "include",
+        });
+
+        // Render the file compatible with the `--libc` Zig flag."""
+if needle not in text:
+    sys.exit("could not locate apple-sdk/build.zig insertion point")
+path.write_text(text.replace(needle, insert, 1))
+PY
+
+    rm -rf "$SRC_DIR/.zig-cache"
 }
 
 ensure_gettext() {
@@ -117,11 +226,11 @@ build_kit() {
 
 install_kit() {
     local found
-    found="$(find "$SRC_DIR/zig-out" -name 'GhosttyKit.xcframework' -type d | head -n 1)"
+    found="$(find "$SRC_DIR/zig-out" "$SRC_DIR/macos" -name 'GhosttyKit.xcframework' -type d 2>/dev/null | head -n 1)"
     if [[ -z "$found" ]]; then
-        found="$(find "$SRC_DIR/zig-out" -name '*.xcframework' -type d | head -n 1)"
+        found="$(find "$SRC_DIR/zig-out" "$SRC_DIR/macos" -name '*.xcframework' -type d 2>/dev/null | head -n 1)"
     fi
-    [[ -n "$found" ]] || die "zig build finished but no .xcframework was found under zig-out"
+    [[ -n "$found" ]] || die "zig build finished but no .xcframework was found under zig-out or macos"
 
     log "installing $(basename "$found") -> $KIT_DEST"
     rm -rf "$KIT_DEST"
@@ -134,6 +243,13 @@ install_kit() {
 
     git -C "$SRC_DIR" rev-parse HEAD > "$VENDOR_DIR/GHOSTTY_REVISION"
     log "Ghostty revision $(cat "$VENDOR_DIR/GHOSTTY_REVISION")"
+
+    # SwiftPM target is GhosttyKit; rename the Clang module so it does not collide.
+    local modulemap
+    modulemap="$(find "$KIT_DEST" -name module.modulemap -type f | head -n 1)"
+    if [[ -n "$modulemap" ]]; then
+        sed -i '' 's/module GhosttyKit/module GhosttyKitC/' "$modulemap"
+    fi
 }
 
 zip_kit() {
@@ -149,6 +265,7 @@ zip_kit() {
 ensure_zig
 ensure_gettext
 clone_ghostty
+patch_ghostty_for_xcode27
 build_kit
 install_kit
 zip_kit
