@@ -1,0 +1,4 @@
+#!/bin/sh
+# Xcode 26 dropped a standalone `metallib` binary. Ghostty's Zig build still
+# looks for one on PATH; `xcrun metal` is the replacement.
+exec xcrun metal "$@"

@@ -1,0 +1,7 @@
+GhosttyUI includes, when you build Vendor/GhosttyKit.xcframework, code from Ghostty:
+
+  https://github.com/ghostty-org/ghostty
+
+Ghostty is MIT licensed. Preserve its copyright notices when you redistribute
+the XCFramework. The embedder C API (include/ghostty.h) is the API Ghostty's
+own macOS app uses and can change between Ghostty revisions.

@@ -1,0 +1,16 @@
+.build/
+.swiftpm/
+*.xcodeproj
+xcuserdata/
+DerivedData/
+.DS_Store
+
+# libghostty is ~140MB; publish it as a GitHub Release, not in git.
+Vendor/GhosttyKit.xcframework/
+Vendor/*.xcframework.zip
+
+# Local Ghostty / Zig build trees
+.build-ghostty/
+.zig-cache/
+zig-out/
+Scripts/.zig-toolchain/
